@@ -1,0 +1,29 @@
+
+# Dependencies
+node_modules/
+
+# Environment files (keep example templates)
+.env*
+!.env.example
+
+# Build output
+.next/
+out/
+dist/
+build/
+coverage/
+
+# TypeScript and Next.js generated files
+*.tsbuildinfo
+client/next-env.d.ts
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Local editor and operating system files
+.DS_Store
+*.pem
+.idea/
