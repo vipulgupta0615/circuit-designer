@@ -103,11 +103,31 @@ export default function CircuitEditor() {
   const isRunning = useCircuitStore((state) => state.isRunning);
   const pendingPin = useCircuitStore((state) => state.pendingPin);
   const fileInput = useRef<HTMLInputElement>(null);
+  const resetDialog = useRef<HTMLDialogElement>(null);
+  const resetCancelButton = useRef<HTMLButtonElement>(null);
+  const resetTrigger = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [saving, setSaving] = useState(false);
   const [isProjectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [isResetDialogOpen, setResetDialogOpen] = useState(false);
   const [isLoadingProjects, setLoadingProjects] = useState(false);
   const [savedProjects, setSavedProjects] = useState<CircuitProject[]>([]);
+
+  useEffect(() => {
+    if (!isResetDialogOpen) return;
+
+    const dialog = resetDialog.current;
+    if (!dialog) return;
+    const trigger = resetTrigger.current;
+
+    dialog.showModal();
+    resetCancelButton.current?.focus();
+
+    return () => {
+      if (dialog.open) dialog.close();
+      trigger?.focus();
+    };
+  }, [isResetDialogOpen]);
 
   const loadProject = useCallback(
     (project: CircuitProject) => {
@@ -199,14 +219,6 @@ export default function CircuitEditor() {
   };
 
   const handleResetWorkspace = () => {
-    if (
-      !window.confirm(
-        "Reset the workspace to the starter circuit? Unsaved changes will be lost. Saved projects in the database will not be deleted.",
-      )
-    ) {
-      return;
-    }
-
     try {
       localStorage.removeItem("circuit-designer:last-project");
     } catch (error) {
@@ -347,7 +359,8 @@ export default function CircuitEditor() {
           <button className="reset-button" onClick={resetSimulation} title="Reset simulation"><RotateCcw size={16} /></button>
           <button
             className="header-icon-button"
-            onClick={handleResetWorkspace}
+            ref={resetTrigger}
+            onClick={() => setResetDialogOpen(true)}
             title="Reset workspace to starter circuit"
             aria-label="Reset workspace to starter circuit"
           >
@@ -429,6 +442,67 @@ export default function CircuitEditor() {
             <div className="dialog-footer"><CircleHelp size={14} /> Cloud projects are saved in your MongoDB workspace.</div>
           </section>
         </div>
+      )}
+
+      {isResetDialogOpen && (
+        <dialog
+          ref={resetDialog}
+          className="reset-confirm-dialog"
+          aria-labelledby="reset-dialog-title"
+          aria-describedby="reset-dialog-description"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setResetDialogOpen(false);
+            }
+          }}
+          onCancel={(event) => {
+            event.preventDefault();
+            setResetDialogOpen(false);
+          }}
+          onClick={(event) => {
+            if (event.target !== event.currentTarget) return;
+            const bounds = event.currentTarget.getBoundingClientRect();
+            if (
+              event.clientX < bounds.left ||
+              event.clientX > bounds.right ||
+              event.clientY < bounds.top ||
+              event.clientY > bounds.bottom
+            ) {
+              setResetDialogOpen(false);
+            }
+          }}
+        >
+          <div className="reset-dialog-icon"><RotateCcw size={19} /></div>
+          <p className="eyebrow">STARTER CIRCUIT</p>
+          <h2 id="reset-dialog-title">Reset this workspace?</h2>
+          <p className="reset-dialog-description" id="reset-dialog-description">
+            Your current layout and unsaved changes will be replaced with the starter circuit.
+          </p>
+          <div className="reset-dialog-note">
+            <Cloud size={15} />
+            <span>Your saved cloud projects will not be deleted.</span>
+          </div>
+          <div className="reset-dialog-actions">
+            <button
+              ref={resetCancelButton}
+              className="reset-dialog-cancel"
+              onClick={() => setResetDialogOpen(false)}
+            >
+              Keep editing
+            </button>
+            <button
+              className="reset-dialog-confirm"
+              onClick={() => {
+                setResetDialogOpen(false);
+                handleResetWorkspace();
+              }}
+            >
+              <RotateCcw size={14} />
+              Reset workspace
+            </button>
+          </div>
+        </dialog>
       )}
     </main>
   );
