@@ -55,8 +55,10 @@ Production commands:
 npm run build
 npm run start
 
-# server
+# server type-check/build (optional for the Render deployment below)
 npm run build
+
+# server
 npm run start
 ```
 
@@ -71,4 +73,4 @@ npm run start
 
 ## Deploy
 
-Deploy the Next.js client and Express API separately. Configure `NEXT_PUBLIC_API_URL` on the client and `MONGODB_URI`, `PORT`, and `CLIENT_URL` on the API. The API only starts when it can connect to MongoDB. A live deployment URL and demonstration recording must be supplied by the deployment owner.
+Deploy the Next.js client and Express API separately. For the API on Render, set the build command to `npm install` and the start command to `npm start`. The API runs TypeScript through `tsx` at startup, so the deployment does not need a separate TypeScript build. Configure `MONGODB_URI`, `PORT`, and `CLIENT_URL` on the API, and set `NEXT_PUBLIC_API_URL` on the client. The API only starts when it can connect to MongoDB. A live deployment URL and demonstration recording must be supplied by the deployment owner.
