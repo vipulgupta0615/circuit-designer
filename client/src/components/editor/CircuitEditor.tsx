@@ -150,7 +150,7 @@ export default function CircuitEditor() {
       });
   }, [loadProject, setCircuit]);
 
-  const handleSave = async () => {
+  const handleSave = async (asNew = false) => {
     if (!projectName.trim()) {
       setNotice({ kind: "error", message: "Give this project a name before saving." });
       return;
@@ -165,7 +165,7 @@ export default function CircuitEditor() {
     try {
       const { project: saved } = await saveProject(
         project,
-        projectId?.startsWith("local-") ? null : projectId,
+        asNew || projectId?.startsWith("local-") ? null : projectId,
       );
       setCircuit(saved);
       localStorage.setItem("circuit-designer:last-project", JSON.stringify(saved));
@@ -303,6 +303,15 @@ export default function CircuitEditor() {
           <button className="save-button" onClick={() => void handleSave()} disabled={saving}>
             {saving ? <LoaderCircle className="spin" size={16} /> : <Save size={16} />}
             {saving ? "Saving" : "Save"}
+          </button>
+          <button
+            className="header-icon-button"
+            onClick={() => void handleSave(true)}
+            disabled={saving}
+            aria-label="Save as new project"
+            title="Save as new project"
+          >
+            <Save size={16} /><span>Save as new</span>
           </button>
           <button className={`run-button ${isRunning ? "is-running" : ""}`} onClick={isRunning ? stopSimulation : startSimulation}>
             {isRunning ? <Square size={14} fill="currentColor" /> : <Play size={15} fill="currentColor" />}

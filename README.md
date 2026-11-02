@@ -9,7 +9,7 @@ Circuit Studio is a browser-based 3D circuit workbench built with Next.js, React
 - Click two component pins to add a wire. Click a wire to remove it.
 - Run, stop, and reset the circuit simulation. Toggle ESP32 GPIO2, GPIO4, and GPIO5 while running.
 - Inspect component properties, pinouts, sensor readings, LED state, and wiring warnings.
-- Save and reopen projects through the MongoDB API. If the API is unavailable, the editor clearly saves to this browser instead.
+- Save changes to the current project or save a separate copy to the MongoDB API. If the API is unavailable, the editor clearly saves to this browser instead.
 - Export and import project JSON; copy share links for projects saved through the API.
 
 The simulator currently models basic pin connectivity and the starter ESP32/DHT22/LED circuit. It is a learning simulator, not a SPICE engine or a replacement for testing physical hardware.
