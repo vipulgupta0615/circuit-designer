@@ -10,6 +10,7 @@ import {
   Copy,
   FileUp,
   FolderOpen,
+  House,
   LoaderCircle,
   Play,
   RotateCcw,
@@ -95,6 +96,7 @@ export default function CircuitEditor() {
   const projectName = useCircuitStore((state) => state.projectName);
   const setProjectName = useCircuitStore((state) => state.setProjectName);
   const setCircuit = useCircuitStore((state) => state.setCircuit);
+  const resetWorkspace = useCircuitStore((state) => state.resetWorkspace);
   const startSimulation = useCircuitStore((state) => state.startSimulation);
   const stopSimulation = useCircuitStore((state) => state.stopSimulation);
   const resetSimulation = useCircuitStore((state) => state.resetSimulation);
@@ -194,6 +196,31 @@ export default function CircuitEditor() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleResetWorkspace = () => {
+    if (
+      !window.confirm(
+        "Reset the workspace to the starter circuit? Unsaved changes will be lost. Saved projects in the database will not be deleted.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      localStorage.removeItem("circuit-designer:last-project");
+    } catch (error) {
+      setNotice({
+        kind: "error",
+        message: "Could not clear this device's saved project, so the workspace was not reset.",
+      });
+      console.error("Could not clear the last local project before workspace reset:", error);
+      return;
+    }
+
+    resetWorkspace();
+    window.history.replaceState(null, "", "/editor");
+    setNotice({ kind: "success", message: "Workspace reset to the starter circuit." });
   };
 
   const handleOpenProjects = async () => {
@@ -318,6 +345,14 @@ export default function CircuitEditor() {
             {isRunning ? "Stop" : "Run"}
           </button>
           <button className="reset-button" onClick={resetSimulation} title="Reset simulation"><RotateCcw size={16} /></button>
+          <button
+            className="header-icon-button"
+            onClick={handleResetWorkspace}
+            title="Reset workspace to starter circuit"
+            aria-label="Reset workspace to starter circuit"
+          >
+            <House size={16} /><span>Reset workspace</span>
+          </button>
         </div>
       </header>
 

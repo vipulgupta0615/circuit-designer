@@ -37,6 +37,7 @@ interface CircuitState {
       connections: CircuitConnection[];
     },
   ) => void;
+  resetWorkspace: () => void;
   setProjectName: (name: string) => void;
   removeComponent: (id: string) => void;
   selectComponent: (id: string | null) => void;
@@ -222,6 +223,29 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       humidity: null,
       simulationLogs: [],
     }),
+
+  resetWorkspace: () => {
+    const starter = createStarterCircuit();
+    set({
+      components: starter.components,
+      connections: starter.connections,
+      projectId: null,
+      projectName: "ESP32 Smart Home Monitoring System",
+      pendingPin: null,
+      selectedComponentId: null,
+      isRunning: false,
+      gpioStates: {
+        GPIO2: false,
+        GPIO4: false,
+        GPIO5: false,
+      },
+      ledOn: false,
+      dht22Connected: false,
+      temperature: null,
+      humidity: null,
+      simulationLogs: [],
+    });
+  },
 
   setProjectName: (projectName) => set({ projectName }),
 
