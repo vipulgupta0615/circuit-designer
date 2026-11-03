@@ -23,7 +23,6 @@ import {
 import ComponentLibrary from "./ComponentLibrary";
 import PropertiesPanel from "./PropertiesPanel";
 import SimulationConsole from "./SimulationConsole";
-import { isComponentType } from "@/lib/componentCatalog";
 import { useCircuitStore } from "@/store/circuitStore";
 import { getProject, listProjects, saveProject } from "@/lib/api";
 import type {
@@ -45,10 +44,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isCircuitComponent(value: unknown): value is CircuitComponent {
   if (!isRecord(value)) return false;
+  const componentTypes: string[] = [
+    "esp32",
+    "breadboard",
+    "led",
+    "resistor",
+    "dht22",
+  ];
   return (
     typeof value.id === "string" &&
     typeof value.name === "string" &&
-    isComponentType(value.type) &&
+    typeof value.type === "string" &&
+    componentTypes.includes(value.type) &&
     Array.isArray(value.position) &&
     value.position.length === 3 &&
     value.position.every((axis) => typeof axis === "number" && Number.isFinite(axis)) &&

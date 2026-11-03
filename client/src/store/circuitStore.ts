@@ -1,18 +1,14 @@
 import { create } from "zustand";
-import {
-  getComponentDefinition,
-  getDefaultProperties,
-  isValidComponentPin,
-} from "@/lib/componentCatalog";
 import { evaluateCircuit } from "@/lib/circuitSimulation";
 
 import type {
   CircuitComponent,
   CircuitConnection,
-  ComponentProperties,
   ComponentType,
   PinReference,
 } from "@/types/circuit";
+
+type ComponentProperties = Record<string, string | number | boolean>;
 
 interface CircuitState {
   components: CircuitComponent[];
@@ -67,7 +63,15 @@ interface CircuitState {
 }
 
 function getDefaultComponentName(type: ComponentType): string {
-  return getComponentDefinition(type).name;
+  const names: Record<ComponentType, string> = {
+    esp32: "ESP32 DevKit V1",
+    breadboard: "Breadboard",
+    led: "LED",
+    resistor: "Resistor 220Ω",
+    dht22: "DHT22 Sensor",
+  };
+
+  return names[type];
 }
 
 function createStarterCircuit() {
@@ -78,7 +82,7 @@ function createStarterCircuit() {
       name: "ESP32 DevKit V1",
       position: [-2.65, 0.2, 0],
       rotation: 0,
-      properties: getDefaultProperties("esp32"),
+      properties: {},
     },
     {
       id: "starter-dht22",
@@ -86,7 +90,7 @@ function createStarterCircuit() {
       name: "DHT22 Sensor",
       position: [1.8, 0.45, -1.15],
       rotation: 0,
-      properties: getDefaultProperties("dht22"),
+      properties: {},
     },
     {
       id: "starter-led",
@@ -94,7 +98,7 @@ function createStarterCircuit() {
       name: "Status LED",
       position: [1.45, 0.25, 1.15],
       rotation: 0,
-      properties: getDefaultProperties("led"),
+      properties: {},
     },
     {
       id: "starter-resistor",
@@ -102,7 +106,7 @@ function createStarterCircuit() {
       name: "220Ω Resistor",
       position: [0.55, 0.25, 1.25],
       rotation: Math.PI / 2,
-      properties: getDefaultProperties("resistor"),
+      properties: {},
     },
     {
       id: "starter-breadboard",
@@ -110,7 +114,7 @@ function createStarterCircuit() {
       name: "Solderless Breadboard",
       position: [0.15, -0.02, 0],
       rotation: 0,
-      properties: getDefaultProperties("breadboard"),
+      properties: {},
     },
   ];
 
@@ -182,7 +186,7 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
           (Math.floor(state.components.length / 2) - 1) * 2.5,
         ],
         rotation: 0,
-        properties: getDefaultProperties(type),
+        properties: {},
       };
 
       const components = [...state.components, component];
@@ -353,22 +357,6 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
       );
 
       if (!fromExists || !toExists) {
-        return state;
-      }
-
-      const fromComponent = state.components.find(
-        (component) => component.id === from.componentId,
-      );
-      const toComponent = state.components.find(
-        (component) => component.id === to.componentId,
-      );
-
-      if (
-        !fromComponent ||
-        !toComponent ||
-        !isValidComponentPin(fromComponent.type, from.pinId) ||
-        !isValidComponentPin(toComponent.type, to.pinId)
-      ) {
         return state;
       }
 
