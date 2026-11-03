@@ -1,4 +1,5 @@
 import type { CircuitComponent, CircuitConnection } from "@/types/circuit";
+import { isValidComponentPin } from "@/lib/componentCatalog";
 
 export interface SimulationResult {
   ledOn: boolean;
@@ -19,6 +20,15 @@ function getNumericProperty(
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : fallback;
+}
+
+function getBooleanProperty(
+  component: CircuitComponent,
+  key: string,
+  fallback: boolean,
+): boolean {
+  const value = component.properties[key];
+  return typeof value === "boolean" ? value : fallback;
 }
 
 function getNode(componentId: string, pinId: string): PinNode {
@@ -139,8 +149,30 @@ export function evaluateCircuit(
   // Build electrical connectivity graph.
   const graph = new Map<PinNode, Set<PinNode>>();
 
-  // Add user-created wires.
+  // Add valid user-created wires. Imported project files can contain stale pin
+  // names, so we flag and ignore those connections instead of treating them as
+  // invisible electrical shortcuts.
   connections.forEach((connection) => {
+    const fromComponent = components.find(
+      (component) => component.id === connection.from.componentId,
+    );
+    const toComponent = components.find(
+      (component) => component.id === connection.to.componentId,
+    );
+
+    if (!fromComponent || !toComponent) {
+      logs.push(`ERROR: Wire ${connection.id} references a component that is no longer in the workspace.`);
+      return;
+    }
+
+    if (
+      !isValidComponentPin(fromComponent.type, connection.from.pinId) ||
+      !isValidComponentPin(toComponent.type, connection.to.pinId)
+    ) {
+      logs.push(`ERROR: Wire ${connection.id} has an invalid pin reference and was ignored.`);
+      return;
+    }
+
     addEdge(
       graph,
       getNode(connection.from.componentId, connection.from.pinId),
@@ -152,6 +184,33 @@ export function evaluateCircuit(
   if (resistor) {
     addEdge(graph, getNode(resistor.id, "pin1"), getNode(resistor.id, "pin2"));
   }
+
+  // Inputs complete their internal contact only while active. This lets a
+  // button or SPDT switch control a normal wire path in the same graph used by
+  // the LED and sensor checks below.
+  components
+    .filter((component) => component.type === "button")
+    .forEach((button) => {
+      const pressed = getBooleanProperty(button, "pressed", false);
+      if (pressed) {
+        addEdge(graph, getNode(button.id, "A"), getNode(button.id, "B"));
+      }
+      logs.push(`${button.name}: ${pressed ? "PRESSED" : "released"}.`);
+    });
+
+  components
+    .filter((component) => component.type === "switch")
+    .forEach((switchComponent) => {
+      const isOn = getBooleanProperty(switchComponent, "isOn", false);
+      addEdge(
+        graph,
+        getNode(switchComponent.id, "COM"),
+        getNode(switchComponent.id, isOn ? "NO" : "NC"),
+      );
+      logs.push(
+        `${switchComponent.name}: COM connected to ${isOn ? "NO" : "NC"}.`,
+      );
+    });
 
   // Add internal breadboard row connectivity.
   const breadboards = components.filter(
@@ -246,8 +305,6 @@ export function evaluateCircuit(
 
     if (dht22Connected) {
       logs.push("DHT22 sensor connected successfully.");
-      logs.push("Temperature: 25.4 °C");
-      logs.push("Humidity: 58.2 %");
     } else {
       logs.push(
         `WARNING: DHT22 wiring incomplete. VCC: ${vccConnected ? "OK" : "MISSING"}, DATA: ${dataConnected ? "OK" : "MISSING"}, GND: ${groundConnected ? "OK" : "MISSING"}.`,
@@ -255,14 +312,27 @@ export function evaluateCircuit(
     }
   }
 
-  const temperatureOffset = dht22
-    ? getNumericProperty(dht22, "temperatureOffset", 0)
-    : 0;
-  const humidityOffset = dht22
-    ? getNumericProperty(dht22, "humidityOffset", 0)
-    : 0;
-  const temperature = dht22Connected ? 25.4 + temperatureOffset : null;
-  const humidity = dht22Connected ? 58.2 + humidityOffset : null;
+  // Keep supporting older exported starter projects that used offsets while
+  // exposing direct, interactive readings in new projects.
+  const temperature = dht22Connected && dht22
+    ? getNumericProperty(
+        dht22,
+        "temperature",
+        25.4 + getNumericProperty(dht22, "temperatureOffset", 0),
+      )
+    : null;
+  const humidity = dht22Connected && dht22
+    ? getNumericProperty(
+        dht22,
+        "humidity",
+        58.2 + getNumericProperty(dht22, "humidityOffset", 0),
+      )
+    : null;
+
+  if (temperature !== null && humidity !== null) {
+    logs.push(`Temperature: ${temperature.toFixed(1)} °C`);
+    logs.push(`Humidity: ${humidity.toFixed(1)} %`);
+  }
 
   return {
     ledOn,

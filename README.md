@@ -4,12 +4,19 @@ Circuit Studio is a browser-based 3D circuit workbench built with Next.js, React
 
 ## What works
 
-- Add and search ESP32, breadboard, DHT22, LED, and resistor parts.
+- Add and search 15 component models across microcontrollers, sensors,
+  LEDs/displays, passives, switches, motors, power supplies, and prototyping.
+- Work with recognizable, connectable 3D models for every library part,
+  including Arduino, OLED, RGB LED, capacitor, button, toggle switch, servo,
+  DC motor, battery, and bench supply.
 - Select, move, rotate, and delete 3D components; orbit, pan, and zoom the scene.
 - Click two component pins to add a wire. Click a wire to remove it.
 - Reset the workspace to the starter circuit without deleting projects saved in the database.
 - Run, stop, and reset the circuit simulation. Toggle ESP32 GPIO2, GPIO4, and GPIO5 while running.
-- Inspect component properties, pinouts, sensor readings, LED state, and wiring warnings.
+- Drive wire paths with simulated push buttons and SPDT toggle switches; edit
+  live DHT22 temperature and humidity readings from the component properties.
+- Inspect component properties, pinouts, sensor readings, LED state, and
+  invalid/disconnected wiring warnings.
 - Save changes to the current project or save a separate copy to the MongoDB API. If the API is unavailable, the editor clearly saves to this browser instead.
 - Export and import project JSON; copy share links for projects saved through the API.
 
