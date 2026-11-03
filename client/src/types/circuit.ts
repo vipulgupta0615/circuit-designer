@@ -1,9 +1,21 @@
 export type ComponentType =
   | "esp32"
+  | "arduino"
   | "breadboard"
   | "led"
+  | "rgbLed"
+  | "oled"
   | "resistor"
+  | "capacitor"
+  | "button"
+  | "switch"
+  | "servo"
+  | "dcMotor"
+  | "battery"
+  | "powerSupply"
   | "dht22";
+
+export type ComponentProperties = Record<string, string | number | boolean>;
 
 export interface CircuitComponent {
   id: string;
@@ -11,7 +23,7 @@ export interface CircuitComponent {
   name: string;
   position: [number, number, number];
   rotation: number;
-  properties: Record<string, string | number | boolean>;
+  properties: ComponentProperties;
 }
 
 export interface PinReference {

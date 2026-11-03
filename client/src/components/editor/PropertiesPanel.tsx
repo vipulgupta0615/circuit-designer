@@ -1,6 +1,10 @@
 "use client";
 
 import { useCircuitStore } from "@/store/circuitStore";
+import {
+  getComponentDefinition,
+  type ComponentPropertyDefinition,
+} from "@/lib/componentCatalog";
 import { Trash2, RotateCw, Settings2 } from "lucide-react";
 
 export default function PropertiesPanel() {
@@ -18,13 +22,9 @@ export default function PropertiesPanel() {
   );
 
   const component = components.find((item) => item.id === selectedId);
-  const pinouts: Record<string, string[]> = {
-    esp32: ["GND", "3V3", "GPIO2", "GPIO4", "GPIO5"],
-    dht22: ["VCC", "DATA", "NC", "GND"],
-    led: ["anode", "cathode"],
-    resistor: ["pin1", "pin2"],
-    breadboard: ["r0c0–r19c7", "rail_pos_0–19", "rail_neg_0–19"],
-  };
+  const definition = component
+    ? getComponentDefinition(component.type)
+    : null;
 
   const handlePositionChange = (axisIndex: number, value: string) => {
     if (!component || value === "") return;
@@ -53,150 +53,80 @@ export default function PropertiesPanel() {
     updateRotation(component.id, component.rotation + Math.PI / 2);
   };
 
-  const renderTextField = (
-    label: string,
-    key: string,
-    defaultValue: string,
-  ) => (
-    <div className="space-y-1" key={key}>
-      <label className="text-xs text-gray-400">{label}</label>
-      <input
-        type="text"
-        value={String(component?.properties[key] ?? defaultValue)}
-        onChange={(e) => handlePropertyChange(key, e.target.value)}
-        className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500"
-      />
-    </div>
-  );
-
-  const renderNumberField = (
-    label: string,
-    key: string,
-    defaultValue: number,
-    unit?: string,
-  ) => (
-    <div className="space-y-1" key={key}>
-      <label className="text-xs text-gray-400">{label}</label>
-
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          step="any"
-          value={Number(component?.properties[key] ?? defaultValue)}
-          onChange={(e) => {
-            if (e.target.value === "") return;
-
-            handlePropertyChange(key, Number(e.target.value));
-          }}
-          className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500"
-        />
-
-        {unit && <span className="text-xs text-gray-400">{unit}</span>}
-      </div>
-    </div>
-  );
-
-  const renderComponentSettings = () => {
+  const renderPropertyField = (property: ComponentPropertyDefinition) => {
     if (!component) return null;
 
-    switch (component.type) {
-      case "esp32":
-        return (
-          <>
-            <h3 className="text-sm font-semibold mb-3">ESP32 Configuration</h3>
-
-            {renderTextField("Board Model", "boardModel", "ESP32 DevKit V1")}
-
-            {renderNumberField("Logic Voltage", "logicVoltage", 3.3, "V")}
-
-            {renderTextField(
-              "GPIO Configuration",
-              "gpioConfiguration",
-              "GPIO2, GPIO4, GPIO5",
-            )}
-          </>
-        );
-
-      case "led":
-        return (
-          <>
-            <h3 className="text-sm font-semibold mb-3">LED Configuration</h3>
-
-            {renderTextField("LED Color", "color", "Red")}
-
-            {renderNumberField("Forward Voltage", "forwardVoltage", 2, "V")}
-          </>
-        );
-
-      case "resistor":
-        return (
-          <>
-            <h3 className="text-sm font-semibold mb-3">
-              Resistor Configuration
-            </h3>
-
-            {renderNumberField("Resistance", "resistanceOhms", 220, "Ω")}
-
-            {renderNumberField("Tolerance", "tolerance", 5, "%")}
-          </>
-        );
-
-      case "dht22":
-        return (
-          <>
-            <h3 className="text-sm font-semibold mb-3">DHT22 Configuration</h3>
-
-            {renderNumberField(
-              "Sampling Interval",
-              "samplingIntervalMs",
-              2000,
-              "ms",
-            )}
-
-            {renderNumberField(
-              "Temperature Offset",
-              "temperatureOffset",
-              0,
-              "°C",
-            )}
-
-            {renderNumberField("Humidity Offset", "humidityOffset", 0, "%")}
-          </>
-        );
-
-      case "breadboard":
-        return (
-          <>
-            <h3 className="text-sm font-semibold mb-3">
-              Breadboard Configuration
-            </h3>
-
-            <div className="rounded-lg bg-gray-800 p-3 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Rows</span>
-                <span>20</span>
-              </div>
-
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Columns</span>
-                <span>8</span>
-              </div>
-
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Power rails</span>
-                <span>2</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-gray-500 mt-2">
-              Breadboard dimensions are fixed in the current simulator.
-            </p>
-          </>
-        );
-
-      default:
-        return null;
+    const value = component.properties[property.key] ?? property.defaultValue;
+    if (property.kind === "boolean") {
+      return (
+        <label key={property.key} className="flex items-center justify-between gap-3 text-sm text-gray-300">
+          {property.label}
+          <input
+            type="checkbox"
+            checked={Boolean(value)}
+            onChange={(event) =>
+              handlePropertyChange(property.key, event.target.checked)
+            }
+          />
+        </label>
+      );
     }
+
+    if (property.kind === "number") {
+      return (
+        <div className="space-y-1" key={property.key}>
+          <label className="text-xs text-gray-400">{property.label}</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              step="any"
+              value={Number(value)}
+              onChange={(event) => {
+                if (event.target.value !== "") {
+                  handlePropertyChange(property.key, Number(event.target.value));
+                }
+              }}
+              className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500"
+            />
+            {property.unit && (
+              <span className="text-xs text-gray-400">{property.unit}</span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1" key={property.key}>
+        <label className="text-xs text-gray-400">{property.label}</label>
+        <input
+          type="text"
+          value={String(value)}
+          onChange={(event) => handlePropertyChange(property.key, event.target.value)}
+          className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500"
+        />
+      </div>
+    );
+  };
+
+  const renderComponentSettings = () => {
+    if (!definition) return null;
+    if (definition.properties.length === 0) {
+      return (
+        <p className="text-xs text-gray-500">
+          This {definition.name.toLowerCase()} has no adjustable specifications.
+        </p>
+      );
+    }
+
+    return (
+      <>
+        <h3 className="text-sm font-semibold mb-3">
+          {definition.name} specifications
+        </h3>
+        {definition.properties.map(renderPropertyField)}
+      </>
+    );
   };
 
   return (
@@ -259,7 +189,7 @@ export default function PropertiesPanel() {
           <section className="pinout-section">
             <h3 className="text-sm font-semibold mb-3">Available pins</h3>
             <div className="pinout-list">
-              {pinouts[component.type].map((pin) => (
+              {definition?.pins.map((pin) => (
                 <span key={pin} className="pinout-chip">{pin}</span>
               ))}
             </div>
@@ -270,6 +200,20 @@ export default function PropertiesPanel() {
 
           {/* Component-specific settings */}
           <section className="space-y-3">{renderComponentSettings()}</section>
+
+          {(component.type === "button" || component.type === "switch") && (
+            <p className="rounded-md border border-lime-300/10 bg-lime-300/5 px-3 py-2 text-xs leading-relaxed text-lime-100/80">
+              This is a live simulation input. Change its state above while the
+              simulation is running to open or close its electrical path.
+            </p>
+          )}
+
+          {component.type === "dht22" && (
+            <p className="rounded-md border border-sky-300/10 bg-sky-300/5 px-3 py-2 text-xs leading-relaxed text-sky-100/80">
+              Adjust the simulated environment values above, then run the
+              circuit to publish the readings to the console.
+            </p>
+          )}
 
           <div className="border-t border-gray-800" />
 
