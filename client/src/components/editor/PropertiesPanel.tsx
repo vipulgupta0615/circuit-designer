@@ -1,12 +1,49 @@
 "use client";
 
+import { useState } from "react";
 import { useCircuitStore } from "@/store/circuitStore";
 import { getComponentDefinition } from "@/lib/componentRegistry";
-import { Trash2, RotateCw, Settings2 } from "lucide-react";
+import { Cable, Trash2, RotateCw, Settings2 } from "lucide-react";
+import type { CircuitComponent } from "@/types/circuit";
+
+interface ConnectablePin {
+  id: string;
+  label: string;
+}
+
+function getConnectablePins(component: CircuitComponent): ConnectablePin[] {
+  if (component.type !== "breadboard") {
+    return getComponentDefinition(component.type).pins
+      .filter((pin) => pin.kind !== "no-connect")
+      .map((pin) => ({ id: pin.id, label: pin.label }));
+  }
+
+  const railPins = (rail: "pos" | "neg", label: string) =>
+    Array.from({ length: 20 }, (_, index) => ({
+      id: `rail_${rail}_${index}`,
+      label: `${label} rail · point ${index + 1}`,
+    }));
+
+  const terminalPins = Array.from({ length: 20 }, (_, row) =>
+    Array.from({ length: 8 }, (_, column) => ({
+      id: `r${row}c${column}`,
+      label: `Row ${row + 1} · ${column < 4 ? "left" : "right"} strip · hole ${(column % 4) + 1}`,
+    })),
+  ).flat();
+
+  return [
+    ...railPins("pos", "Positive (+)"),
+    ...railPins("neg", "Negative (−)"),
+    ...terminalPins,
+  ];
+}
 
 export default function PropertiesPanel() {
   const components = useCircuitStore((state) => state.components);
   const selectedId = useCircuitStore((state) => state.selectedComponentId);
+  const connections = useCircuitStore((state) => state.connections);
+  const addConnection = useCircuitStore((state) => state.addConnection);
+  const connectionFeedback = useCircuitStore((state) => state.connectionFeedback);
 
   const removeComponent = useCircuitStore((state) => state.removeComponent);
   const updatePosition = useCircuitStore((state) => state.updatePosition);
@@ -18,8 +55,22 @@ export default function PropertiesPanel() {
     (state) => state.updateComponentProperties,
   );
   const isReadOnly = useCircuitStore((state) => state.isReadOnly);
+  const [fromComponentId, setFromComponentId] = useState("");
+  const [fromPinId, setFromPinId] = useState("");
+  const [toComponentId, setToComponentId] = useState("");
+  const [toPinId, setToPinId] = useState("");
 
   const component = components.find((item) => item.id === selectedId);
+  const fromComponent =
+    components.find((item) => item.id === fromComponentId) ?? components[0];
+  const toComponent =
+    components.find(
+      (item) => item.id === toComponentId && item.id !== fromComponent?.id,
+    ) ?? components.find((item) => item.id !== fromComponent?.id);
+  const fromPins = fromComponent ? getConnectablePins(fromComponent) : [];
+  const toPins = toComponent ? getConnectablePins(toComponent) : [];
+  const fromPin = fromPins.find((pin) => pin.id === fromPinId) ?? fromPins[0];
+  const toPin = toPins.find((pin) => pin.id === toPinId) ?? toPins[0];
   const pinouts = component
     ? component.type === "breadboard"
       ? ["r0c0–r19c7", "rail_pos_0–19", "rail_neg_0–19"]
@@ -207,8 +258,110 @@ export default function PropertiesPanel() {
     <aside className="properties-panel w-72 shrink-0 bg-[#111827] border-l border-gray-800 text-white p-4 overflow-y-auto">
       <div className="mb-6">
         <h2 className="font-semibold text-lg">Properties</h2>
-        <p className="text-xs text-gray-400 mt-1">Component configuration</p>
+        <p className="text-xs text-gray-400 mt-1">Wire parts and configure components</p>
       </div>
+
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Cable size={16} className="text-blue-400" />
+          <h3 className="text-sm font-semibold">Wire components</h3>
+        </div>
+        <p className="text-xs text-gray-500">
+          Choose components and pin names here; you don’t need to click the tiny pins in the 3D view.
+        </p>
+
+        {components.length < 2 ? (
+          <p className="rounded-lg bg-gray-800 p-3 text-xs text-gray-400">
+            Add at least two components to create a wire.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label htmlFor="wire-from-component" className="block text-xs text-gray-400">From component</label>
+              <select
+                id="wire-from-component"
+                value={fromComponent?.id ?? ""}
+                disabled={isReadOnly}
+                onChange={(event) => {
+                  const nextId = event.target.value;
+                  setFromComponentId(nextId);
+                  setFromPinId("");
+                  if (nextId === toComponent?.id) {
+                    setToComponentId("");
+                    setToPinId("");
+                  }
+                }}
+                className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white"
+              >
+                {components.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name} ({item.type.toUpperCase()})</option>
+                ))}
+              </select>
+              <label htmlFor="wire-from-pin" className="block text-xs text-gray-400">From pin</label>
+              <select
+                id="wire-from-pin"
+                value={fromPin?.id ?? ""}
+                disabled={isReadOnly || fromPins.length === 0}
+                onChange={(event) => setFromPinId(event.target.value)}
+                className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white"
+              >
+                {fromPins.map((pin) => <option key={pin.id} value={pin.id}>{pin.label}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="wire-to-component" className="block text-xs text-gray-400">To component</label>
+              <select
+                id="wire-to-component"
+                value={toComponent?.id ?? ""}
+                disabled={isReadOnly || components.length < 2}
+                onChange={(event) => {
+                  setToComponentId(event.target.value);
+                  setToPinId("");
+                }}
+                className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white"
+              >
+                {components
+                  .filter((item) => item.id !== fromComponent?.id)
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>{item.name} ({item.type.toUpperCase()})</option>
+                  ))}
+              </select>
+              <label htmlFor="wire-to-pin" className="block text-xs text-gray-400">To pin</label>
+              <select
+                id="wire-to-pin"
+                value={toPin?.id ?? ""}
+                disabled={isReadOnly || toPins.length === 0}
+                onChange={(event) => setToPinId(event.target.value)}
+                className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white"
+              >
+                {toPins.map((pin) => <option key={pin.id} value={pin.id}>{pin.label}</option>)}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              disabled={isReadOnly || !fromComponent || !toComponent || !fromPin || !toPin}
+              onClick={() => {
+                if (!fromComponent || !toComponent || !fromPin || !toPin) return;
+                addConnection(
+                  { componentId: fromComponent.id, pinId: fromPin.id },
+                  { componentId: toComponent.id, pinId: toPin.id },
+                );
+              }}
+              className="w-full rounded-lg bg-blue-600 p-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Create wire
+            </button>
+            <p className="text-xs text-gray-500">{connections.length} wire{connections.length === 1 ? "" : "s"} in this circuit</p>
+            {connectionFeedback && (
+              <p className="text-xs text-blue-300" role="status">{connectionFeedback}</p>
+            )}
+          </div>
+        )}
+      </section>
+
+      <div className="my-4 border-t border-gray-800" />
 
       {!component ? (
         <div className="flex flex-col items-center justify-center text-center mt-16 gap-3">
@@ -268,7 +421,7 @@ export default function PropertiesPanel() {
                 <span key={pin} className="pinout-chip">{pin}</span>
               ))}
             </div>
-            <p className="mt-2 text-xs text-gray-500">Click any two pins in the scene to create a wire.</p>
+            <p className="mt-2 text-xs text-gray-500">Create connections with the Wire components controls above, or click two pins in the scene.</p>
           </section>
 
           <div className="border-t border-gray-800" />
