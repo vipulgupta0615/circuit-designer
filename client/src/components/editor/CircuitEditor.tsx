@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Save,
   Square,
+  Trash2,
   Wifi,
   X,
   Zap,
@@ -24,7 +25,14 @@ import ComponentLibrary from "./ComponentLibrary";
 import PropertiesPanel from "./PropertiesPanel";
 import SimulationConsole from "./SimulationConsole";
 import { useCircuitStore } from "@/store/circuitStore";
-import { getProject, listProjects, saveProject } from "@/lib/api";
+import {
+  createShareLink,
+  deleteProject as deleteProjectRequest,
+  getProject,
+  getSharedProject,
+  listProjects,
+  saveProject,
+} from "@/lib/api";
 import type {
   CircuitComponent,
   CircuitConnection,
@@ -40,6 +48,12 @@ type Notice = { kind: "success" | "error" | "info"; message: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function hasScalarProperties(value: unknown): value is Record<string, string | number | boolean> {
+  return isRecord(value) && Object.values(value).every(
+    (property) => typeof property === "string" || typeof property === "number" || typeof property === "boolean",
+  );
 }
 
 function isCircuitComponent(value: unknown): value is CircuitComponent {
@@ -60,7 +74,7 @@ function isCircuitComponent(value: unknown): value is CircuitComponent {
     value.position.length === 3 &&
     value.position.every((axis) => typeof axis === "number" && Number.isFinite(axis)) &&
     typeof value.rotation === "number" &&
-    isRecord(value.properties)
+    hasScalarProperties(value.properties)
   );
 }
 
@@ -80,12 +94,17 @@ function isProjectFile(
   value: unknown,
 ): value is Omit<CircuitProject, "id"> & { id?: unknown } {
   if (!isRecord(value)) return false;
-  return (
+  if (!(
     typeof value.name === "string" &&
     Array.isArray(value.components) &&
     value.components.every(isCircuitComponent) &&
     Array.isArray(value.connections) &&
     value.connections.every(isCircuitConnection)
+  )) return false;
+
+  const componentIds = new Set(value.components.map((component) => component.id));
+  return componentIds.size === value.components.length && value.connections.every(
+    (connection) => componentIds.has(connection.from.componentId) && componentIds.has(connection.to.componentId),
   );
 }
 
@@ -102,6 +121,11 @@ export default function CircuitEditor() {
   const resetSimulation = useCircuitStore((state) => state.resetSimulation);
   const isRunning = useCircuitStore((state) => state.isRunning);
   const pendingPin = useCircuitStore((state) => state.pendingPin);
+  const connectionFeedback = useCircuitStore((state) => state.connectionFeedback);
+  const isReadOnly = useCircuitStore((state) => state.isReadOnly);
+  const gpioStates = useCircuitStore((state) => state.gpioStates);
+  const gpioModes = useCircuitStore((state) => state.gpioModes);
+  const forkSharedProject = useCircuitStore((state) => state.forkSharedProject);
   const fileInput = useRef<HTMLInputElement>(null);
   const resetDialog = useRef<HTMLDialogElement>(null);
   const resetCancelButton = useRef<HTMLButtonElement>(null);
@@ -131,7 +155,7 @@ export default function CircuitEditor() {
 
   const loadProject = useCallback(
     (project: CircuitProject) => {
-      setCircuit(project);
+      setCircuit(project, false);
       setProjectMenuOpen(false);
       setNotice({ kind: "success", message: `Opened “${project.name}”.` });
       window.history.replaceState(null, "", `/editor?project=${project.id}`);
@@ -140,7 +164,20 @@ export default function CircuitEditor() {
   );
 
   useEffect(() => {
-    const projectToLoad = new URLSearchParams(window.location.search).get("project");
+    const search = new URLSearchParams(window.location.search);
+    const sharedToken = search.get("share");
+    const projectToLoad = search.get("project");
+    if (sharedToken) {
+      getSharedProject(sharedToken)
+        .then(({ project }) => {
+          setCircuit(project, true);
+          setNotice({ kind: "info", message: `Opened read-only shared project “${project.name}”.` });
+        })
+        .catch((error: unknown) => {
+          setNotice({ kind: "error", message: error instanceof Error ? error.message : "Could not load the shared project." });
+        });
+      return;
+    }
     if (!projectToLoad) {
       void Promise.resolve()
         .then(() => {
@@ -173,6 +210,10 @@ export default function CircuitEditor() {
   }, [loadProject, setCircuit]);
 
   const handleSave = async (asNew = false) => {
+    if (isReadOnly) {
+      setNotice({ kind: "info", message: "Fork this shared project before saving changes." });
+      return;
+    }
     if (!projectName.trim()) {
       setNotice({ kind: "error", message: "Give this project a name before saving." });
       return;
@@ -182,6 +223,8 @@ export default function CircuitEditor() {
       name: projectName.trim(),
       components,
       connections,
+      schemaVersion: 1,
+      simulationSettings: { gpioStates, gpioModes },
     };
 
     try {
@@ -272,7 +315,7 @@ export default function CircuitEditor() {
 
   const handleExport = () => {
     const file = new Blob(
-      [JSON.stringify({ name: projectName, components, connections }, null, 2)],
+      [JSON.stringify({ name: projectName, schemaVersion: 1, components, connections, simulationSettings: { gpioStates, gpioModes } }, null, 2)],
       { type: "application/json" },
     );
     const url = URL.createObjectURL(file);
@@ -290,11 +333,27 @@ export default function CircuitEditor() {
       return;
     }
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/editor?project=${projectId}`);
+      const { token } = await createShareLink(projectId);
+      await navigator.clipboard.writeText(`${window.location.origin}/editor?share=${token}`);
       setNotice({ kind: "success", message: "Share link copied to clipboard." });
     } catch (error) {
       setNotice({ kind: "error", message: "Clipboard access failed. Copy the project URL from your browser." });
       console.error("Could not copy share link:", error);
+    }
+  };
+
+  const handleDeleteProject = async (project: CircuitProject) => {
+    if (!window.confirm(`Delete “${project.name}”? This cannot be undone.`)) return;
+    try {
+      await deleteProjectRequest(project.id);
+      setSavedProjects((items) => items.filter((item) => item.id !== project.id));
+      if (projectId === project.id) {
+        resetWorkspace();
+        window.history.replaceState(null, "", "/editor");
+      }
+      setNotice({ kind: "success", message: `Deleted “${project.name}”.` });
+    } catch (error) {
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Could not delete this project." });
     }
   };
 
@@ -316,6 +375,7 @@ export default function CircuitEditor() {
             onChange={(event) => setProjectName(event.target.value)}
           />
           <span className="project-meta"><span className="saved-dot" /> {components.length} parts <span className="meta-separator">·</span> {connections.length} connections</span>
+          {isReadOnly && <span className="project-meta">PUBLIC READ-ONLY VIEW</span>}
         </div>
 
         <div className="header-actions">
@@ -339,24 +399,28 @@ export default function CircuitEditor() {
             <Copy size={15} /><span>Share</span>
           </button>
           <span className="header-separator" />
+          {isReadOnly ? (
+            <button className="save-button" onClick={forkSharedProject}>Fork to edit</button>
+          ) : (
           <button className="save-button" onClick={() => void handleSave()} disabled={saving}>
             {saving ? <LoaderCircle className="spin" size={16} /> : <Save size={16} />}
             {saving ? "Saving" : "Save"}
           </button>
+          )}
           <button
             className="header-icon-button"
             onClick={() => void handleSave(true)}
-            disabled={saving}
+            disabled={saving || isReadOnly}
             aria-label="Save as new project"
             title="Save as new project"
           >
             <Save size={16} /><span>Save as new</span>
           </button>
-          <button className={`run-button ${isRunning ? "is-running" : ""}`} onClick={isRunning ? stopSimulation : startSimulation}>
+          <button className={`run-button ${isRunning ? "is-running" : ""}`} onClick={isRunning ? stopSimulation : startSimulation} disabled={isReadOnly}>
             {isRunning ? <Square size={14} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
             {isRunning ? "Stop" : "Run"}
           </button>
-          <button className="reset-button" onClick={resetSimulation} title="Reset simulation"><RotateCcw size={16} /></button>
+          <button className="reset-button" onClick={resetSimulation} title="Reset simulation" disabled={isReadOnly}><RotateCcw size={16} /></button>
           <button
             className="header-icon-button"
             ref={resetTrigger}
@@ -389,6 +453,9 @@ export default function CircuitEditor() {
               Choose a second pin to complete the wire
               <button onClick={() => useCircuitStore.getState().cancelPinSelection()} aria-label="Cancel wire"><X size={14} /></button>
             </div>
+          )}
+          {!pendingPin && connectionFeedback && (
+            <div className="connection-feedback" role="status">{connectionFeedback}</div>
           )}
           <div className="workspace-controls">
             <span><kbd>Click</kbd> pin to wire</span>
@@ -429,11 +496,14 @@ export default function CircuitEditor() {
                 <div className="dialog-empty"><LoaderCircle className="spin" size={22} /> Connecting to project library…</div>
               ) : savedProjects.length ? (
                 savedProjects.map((project) => (
-                  <button className="saved-project-row" key={project.id} onClick={() => loadProject(project)}>
+                  <div className="saved-project-row" key={project.id}>
+                  <button className="saved-project-open" onClick={() => loadProject(project)}>
                     <span className="project-row-icon"><Zap size={17} /></span>
                     <span className="saved-project-copy"><strong>{project.name}</strong><small>{project.components.length} components · {project.connections.length} wires</small></span>
                     <span className="open-arrow">↗</span>
                   </button>
+                  <button className="project-delete-button" title={`Delete ${project.name}`} aria-label={`Delete ${project.name}`} onClick={() => void handleDeleteProject(project)}><Trash2 size={15} /></button>
+                  </div>
                 ))
               ) : (
                 <div className="dialog-empty"><Cloud size={24} /><span>No cloud projects found.</span><small>Check your MongoDB API connection, or import a project file.</small></div>

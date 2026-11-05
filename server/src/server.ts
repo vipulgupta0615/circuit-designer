@@ -4,6 +4,7 @@ import express from "express";
 import mongoose from "mongoose";
 import { connectDB } from "./config/db";
 import projectRoutes from "./routes/projectRoutes";
+import { getSharedProject } from "./controllers/projectController";
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/projects", projectRoutes);
+app.get("/api/shared/:token", getSharedProject);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error("Unhandled API error:", error);

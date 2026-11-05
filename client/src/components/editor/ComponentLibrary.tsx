@@ -72,6 +72,7 @@ const componentGroups: {
 
 export default function ComponentLibrary() {
   const addComponent = useCircuitStore((state) => state.addComponent);
+  const isReadOnly = useCircuitStore((state) => state.isReadOnly);
   const [query, setQuery] = useState("");
   const filteredGroups = useMemo(
     () =>
@@ -131,7 +132,8 @@ export default function ComponentLibrary() {
                   <button
                     key={item.type}
                     onClick={() => addComponent(item.type)}
-                    className="component-library-item w-full flex items-center gap-3 p-3 rounded-lg bg-gray-800/70 hover:bg-blue-600/20 hover:border-blue-500 border border-transparent transition text-left"
+                    disabled={isReadOnly}
+                    className="component-library-item w-full flex items-center gap-3 p-3 rounded-lg bg-gray-800/70 hover:bg-blue-600/20 hover:border-blue-500 border border-transparent transition text-left disabled:cursor-not-allowed disabled:opacity-45"
                     title={`Add ${item.name}`}
                   >
                     <span className="component-icon"><Icon size={17} /></span>

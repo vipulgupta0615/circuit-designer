@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
+import { randomBytes } from "node:crypto";
 import mongoose from "mongoose";
-import Project from "../models/Project";
+import Project, { type ProjectDocument } from "../models/Project";
+import { parseProjectPayload } from "../validation/projectValidation";
 
 function databaseUnavailable(res: Response) {
   if (mongoose.connection.readyState === 1) return false;
@@ -10,42 +12,32 @@ function databaseUnavailable(res: Response) {
   return true;
 }
 
-function toProjectResponse(project: InstanceType<typeof Project>) {
+function toProjectResponse(project: ProjectDocument, options: { shared?: boolean } = {}) {
   return {
-    id: project.id,
+    id: project._id.toString(),
     name: project.name,
+    description: project.description,
+    schemaVersion: project.schemaVersion,
     components: project.components,
     connections: project.connections,
+    simulationSettings: project.simulationSettings,
+    ...(options.shared ? { readOnly: true } : { isShared: Boolean(project.publicShareToken) }),
+    createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };
 }
 
-function isProjectPayload(
-  value: unknown,
-): value is { name: string; components: unknown[]; connections: unknown[] } {
-  if (typeof value !== "object" || value === null) return false;
-  const project = value as Record<string, unknown>;
-  return (
-    typeof project.name === "string" &&
-    project.name.trim().length > 0 &&
-    project.name.trim().length <= 100 &&
-    Array.isArray(project.components) &&
-    Array.isArray(project.connections)
-  );
-}
-
 export async function createProject(req: Request, res: Response) {
   if (databaseUnavailable(res)) return;
-  if (!isProjectPayload(req.body)) {
-    res.status(400).json({ message: "A project name, components, and connections are required." });
+  const parsed = parseProjectPayload(req.body);
+  if ("error" in parsed) {
+    res.status(400).json({ message: parsed.error });
     return;
   }
 
   try {
     const project = await Project.create({
-      name: req.body.name.trim(),
-      components: req.body.components,
-      connections: req.body.connections,
+      ...parsed.value,
     });
     res.status(201).json({ project: toProjectResponse(project) });
   } catch (error) {
@@ -93,19 +85,16 @@ export async function updateProject(req: Request, res: Response) {
     res.status(400).json({ message: "The project ID is invalid." });
     return;
   }
-  if (!isProjectPayload(req.body)) {
-    res.status(400).json({ message: "A project name, components, and connections are required." });
+  const parsed = parseProjectPayload(req.body);
+  if ("error" in parsed) {
+    res.status(400).json({ message: parsed.error });
     return;
   }
 
   try {
     const project = await Project.findByIdAndUpdate(
       req.params.id,
-      {
-        name: req.body.name.trim(),
-        components: req.body.components,
-        connections: req.body.connections,
-      },
+      parsed.value,
       { new: true, runValidators: true },
     );
     if (!project) {
@@ -116,5 +105,68 @@ export async function updateProject(req: Request, res: Response) {
   } catch (error) {
     console.error("Could not update project:", error);
     res.status(500).json({ message: "Could not update this project." });
+  }
+}
+
+export async function deleteProject(req: Request, res: Response) {
+  if (databaseUnavailable(res)) return;
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(400).json({ message: "The project ID is invalid." });
+    return;
+  }
+  try {
+    const project = await Project.findByIdAndDelete(req.params.id);
+    if (!project) {
+      res.status(404).json({ message: "Project not found." });
+      return;
+    }
+    res.status(204).send();
+  } catch (error) {
+    console.error("Could not delete project:", error);
+    res.status(500).json({ message: "Could not delete this project." });
+  }
+}
+
+export async function shareProject(req: Request, res: Response) {
+  if (databaseUnavailable(res)) return;
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(400).json({ message: "The project ID is invalid." });
+    return;
+  }
+  try {
+    const token = randomBytes(24).toString("base64url");
+    const project = await Project.findByIdAndUpdate(
+      req.params.id,
+      { publicShareToken: token },
+      { new: true, runValidators: true },
+    ).select("+publicShareToken");
+    if (!project) {
+      res.status(404).json({ message: "Project not found." });
+      return;
+    }
+    res.status(201).json({ token, project: toProjectResponse(project) });
+  } catch (error) {
+    console.error("Could not create project share link:", error);
+    res.status(500).json({ message: "Could not create a share link for this project." });
+  }
+}
+
+export async function getSharedProject(req: Request, res: Response) {
+  const token = req.params.token;
+  if (!token || token.length > 128) {
+    res.status(400).json({ message: "The share token is invalid." });
+    return;
+  }
+  if (databaseUnavailable(res)) return;
+  try {
+    const project = await Project.findOne({ publicShareToken: token }).select("+publicShareToken");
+    if (!project) {
+      res.status(404).json({ message: "Shared project not found." });
+      return;
+    }
+    res.json({ project: toProjectResponse(project, { shared: true }) });
+  } catch (error) {
+    console.error("Could not load shared project:", error);
+    res.status(500).json({ message: "Could not load this shared project." });
   }
 }

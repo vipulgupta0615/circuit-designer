@@ -1,6 +1,7 @@
 "use client";
 
 import { useCircuitStore } from "@/store/circuitStore";
+import { getComponentDefinition } from "@/lib/componentRegistry";
 import { Trash2, RotateCw, Settings2 } from "lucide-react";
 
 export default function PropertiesPanel() {
@@ -16,15 +17,14 @@ export default function PropertiesPanel() {
   const updateComponentProperties = useCircuitStore(
     (state) => state.updateComponentProperties,
   );
+  const isReadOnly = useCircuitStore((state) => state.isReadOnly);
 
   const component = components.find((item) => item.id === selectedId);
-  const pinouts: Record<string, string[]> = {
-    esp32: ["GND", "3V3", "GPIO2", "GPIO4", "GPIO5"],
-    dht22: ["VCC", "DATA", "NC", "GND"],
-    led: ["anode", "cathode"],
-    resistor: ["pin1", "pin2"],
-    breadboard: ["r0c0–r19c7", "rail_pos_0–19", "rail_neg_0–19"],
-  };
+  const pinouts = component
+    ? component.type === "breadboard"
+      ? ["r0c0–r19c7", "rail_pos_0–19", "rail_neg_0–19"]
+      : getComponentDefinition(component.type).pins.map((pin) => pin.label)
+    : [];
 
   const handlePositionChange = (axisIndex: number, value: string) => {
     if (!component || value === "") return;
@@ -63,6 +63,7 @@ export default function PropertiesPanel() {
       <input
         type="text"
         value={String(component?.properties[key] ?? defaultValue)}
+        disabled={isReadOnly}
         onChange={(e) => handlePropertyChange(key, e.target.value)}
         className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500"
       />
@@ -83,6 +84,7 @@ export default function PropertiesPanel() {
           type="number"
           step="any"
           value={Number(component?.properties[key] ?? defaultValue)}
+          disabled={isReadOnly}
           onChange={(e) => {
             if (e.target.value === "") return;
 
@@ -154,13 +156,15 @@ export default function PropertiesPanel() {
             )}
 
             {renderNumberField(
-              "Temperature Offset",
-              "temperatureOffset",
-              0,
+              "Simulated temperature",
+              "temperatureC",
+              25.4,
               "°C",
             )}
 
-            {renderNumberField("Humidity Offset", "humidityOffset", 0, "%")}
+            {renderNumberField("Simulated humidity", "humidityPercent", 58.2, "%")}
+
+            {renderTextField("Data GPIO", "dataGpio", "GPIO4")}
           </>
         );
 
@@ -230,6 +234,7 @@ export default function PropertiesPanel() {
               <input
                 type="text"
                 value={component.name}
+                disabled={isReadOnly}
                 onChange={(e) =>
                   updateComponentName(component.id, e.target.value)
                 }
@@ -259,7 +264,7 @@ export default function PropertiesPanel() {
           <section className="pinout-section">
             <h3 className="text-sm font-semibold mb-3">Available pins</h3>
             <div className="pinout-list">
-              {pinouts[component.type].map((pin) => (
+              {pinouts.map((pin) => (
                 <span key={pin} className="pinout-chip">{pin}</span>
               ))}
             </div>
@@ -289,6 +294,7 @@ export default function PropertiesPanel() {
                     type="number"
                     step="0.1"
                     value={component.position[index]}
+                    disabled={isReadOnly}
                     onChange={(e) =>
                       handlePositionChange(index, e.target.value)
                     }
@@ -315,6 +321,7 @@ export default function PropertiesPanel() {
 
             <button
               onClick={handleRotation}
+              disabled={isReadOnly}
               className="w-full mt-3 flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 rounded-lg p-2 text-sm transition"
             >
               <RotateCw size={16} />
@@ -327,6 +334,7 @@ export default function PropertiesPanel() {
           {/* Delete */}
           <button
             onClick={() => removeComponent(component.id)}
+            disabled={isReadOnly}
             className="w-full flex items-center justify-center gap-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg p-3 text-sm transition"
           >
             <Trash2 size={16} />

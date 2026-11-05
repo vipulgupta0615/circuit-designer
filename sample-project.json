@@ -1,83 +1,28 @@
 {
+  "schemaVersion": 1,
   "name": "ESP32 Smart Home Monitoring System",
+  "description": "A breadboard-routed ESP32/DHT22 monitor with a resistor-protected GPIO2 status LED.",
+  "simulationSettings": {
+    "gpioStates": { "GPIO2": false, "GPIO4": false, "GPIO5": false },
+    "gpioModes": { "GPIO2": "OUTPUT", "GPIO4": "INPUT", "GPIO5": "INPUT" }
+  },
   "components": [
-    {
-      "id": "starter-esp32",
-      "type": "esp32",
-      "name": "ESP32 DevKit V1",
-      "position": [-2.65, 0.2, 0],
-      "rotation": 0,
-      "properties": {}
-    },
-    {
-      "id": "starter-dht22",
-      "type": "dht22",
-      "name": "DHT22 Sensor",
-      "position": [1.8, 0.45, -1.15],
-      "rotation": 0,
-      "properties": {}
-    },
-    {
-      "id": "starter-led",
-      "type": "led",
-      "name": "Status LED",
-      "position": [1.45, 0.25, 1.15],
-      "rotation": 0,
-      "properties": {}
-    },
-    {
-      "id": "starter-resistor",
-      "type": "resistor",
-      "name": "220Ω Resistor",
-      "position": [0.55, 0.25, 1.25],
-      "rotation": 1.5707963267948966,
-      "properties": {}
-    },
-    {
-      "id": "starter-breadboard",
-      "type": "breadboard",
-      "name": "Solderless Breadboard",
-      "position": [0.15, -0.02, 0],
-      "rotation": 0,
-      "properties": {}
-    }
+    { "id": "starter-esp32", "type": "esp32", "name": "ESP32 DevKit V1", "position": [-2.65, 0.2, 0], "rotation": 0, "properties": { "boardModel": "ESP32 DevKit V1", "logicVoltage": 3.3 } },
+    { "id": "starter-dht22", "type": "dht22", "name": "DHT22 Sensor", "position": [1.8, 0.45, -1.15], "rotation": 0, "properties": { "temperatureC": 25.4, "humidityPercent": 58.2, "dataGpio": "GPIO4" } },
+    { "id": "starter-led", "type": "led", "name": "Status LED", "position": [1.45, 0.25, 1.15], "rotation": 0, "properties": { "color": "Red", "forwardVoltage": 2 } },
+    { "id": "starter-resistor", "type": "resistor", "name": "220Ω Resistor", "position": [0.55, 0.25, 1.25], "rotation": 1.5707963267948966, "properties": { "resistanceOhms": 220, "tolerance": 5 } },
+    { "id": "starter-breadboard", "type": "breadboard", "name": "Solderless Breadboard", "position": [0.15, -0.02, 0], "rotation": 0, "properties": { "rows": 20, "columns": 8 } }
   ],
   "connections": [
-    {
-      "id": "starter-wire-1",
-      "from": { "componentId": "starter-esp32", "pinId": "3V3" },
-      "to": { "componentId": "starter-dht22", "pinId": "VCC" },
-      "color": "#f97316"
-    },
-    {
-      "id": "starter-wire-2",
-      "from": { "componentId": "starter-esp32", "pinId": "GPIO4" },
-      "to": { "componentId": "starter-dht22", "pinId": "DATA" },
-      "color": "#22c55e"
-    },
-    {
-      "id": "starter-wire-3",
-      "from": { "componentId": "starter-esp32", "pinId": "GND" },
-      "to": { "componentId": "starter-dht22", "pinId": "GND" },
-      "color": "#64748b"
-    },
-    {
-      "id": "starter-wire-4",
-      "from": { "componentId": "starter-esp32", "pinId": "GPIO2" },
-      "to": { "componentId": "starter-resistor", "pinId": "pin1" },
-      "color": "#ef4444"
-    },
-    {
-      "id": "starter-wire-5",
-      "from": { "componentId": "starter-resistor", "pinId": "pin2" },
-      "to": { "componentId": "starter-led", "pinId": "anode" },
-      "color": "#ef4444"
-    },
-    {
-      "id": "starter-wire-6",
-      "from": { "componentId": "starter-led", "pinId": "cathode" },
-      "to": { "componentId": "starter-esp32", "pinId": "GND" },
-      "color": "#64748b"
-    }
+    { "id": "starter-wire-1", "from": { "componentId": "starter-esp32", "pinId": "3V3" }, "to": { "componentId": "starter-breadboard", "pinId": "rail_pos_0" }, "color": "#f97316" },
+    { "id": "starter-wire-2", "from": { "componentId": "starter-breadboard", "pinId": "rail_pos_14" }, "to": { "componentId": "starter-dht22", "pinId": "VCC" }, "color": "#f97316" },
+    { "id": "starter-wire-3", "from": { "componentId": "starter-esp32", "pinId": "GPIO4" }, "to": { "componentId": "starter-dht22", "pinId": "DATA" }, "color": "#22c55e" },
+    { "id": "starter-wire-4", "from": { "componentId": "starter-esp32", "pinId": "GND" }, "to": { "componentId": "starter-breadboard", "pinId": "rail_neg_0" }, "color": "#64748b" },
+    { "id": "starter-wire-5", "from": { "componentId": "starter-breadboard", "pinId": "rail_neg_14" }, "to": { "componentId": "starter-dht22", "pinId": "GND" }, "color": "#64748b" },
+    { "id": "starter-wire-6", "from": { "componentId": "starter-esp32", "pinId": "GPIO2" }, "to": { "componentId": "starter-resistor", "pinId": "pin1" }, "color": "#ef4444" },
+    { "id": "starter-wire-7", "from": { "componentId": "starter-resistor", "pinId": "pin2" }, "to": { "componentId": "starter-breadboard", "pinId": "r10c0" }, "color": "#ef4444" },
+    { "id": "starter-wire-8", "from": { "componentId": "starter-breadboard", "pinId": "r10c3" }, "to": { "componentId": "starter-led", "pinId": "anode" }, "color": "#ef4444" },
+    { "id": "starter-wire-9", "from": { "componentId": "starter-led", "pinId": "cathode" }, "to": { "componentId": "starter-breadboard", "pinId": "r11c4" }, "color": "#64748b" },
+    { "id": "starter-wire-10", "from": { "componentId": "starter-breadboard", "pinId": "r11c7" }, "to": { "componentId": "starter-esp32", "pinId": "GND" }, "color": "#64748b" }
   ]
 }

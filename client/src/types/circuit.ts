@@ -5,6 +5,16 @@ export type ComponentType =
   | "resistor"
   | "dht22";
 
+export type PinKind =
+  | "power"
+  | "ground"
+  | "signal"
+  | "passive"
+  | "terminal"
+  | "no-connect";
+
+export type GpioMode = "INPUT" | "OUTPUT";
+
 export interface CircuitComponent {
   id: string;
   type: ComponentType;
@@ -24,4 +34,9 @@ export interface CircuitConnection {
   from: PinReference;
   to: PinReference;
   color: string;
+}
+
+export interface SimulationSettings {
+  gpioStates?: Record<string, boolean>;
+  gpioModes?: Record<string, GpioMode>;
 }

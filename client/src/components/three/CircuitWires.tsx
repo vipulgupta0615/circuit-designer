@@ -2,6 +2,7 @@
 "use client";
 
 import { Line } from "@react-three/drei";
+import { useMemo } from "react";
 import { Vector3 } from "three";
 
 import { useCircuitStore } from "@/store/circuitStore";
@@ -34,19 +35,16 @@ export default function CircuitWires() {
   const removeConnection = useCircuitStore(
     (state) => state.removeConnection,
   );
+  const componentsById = useMemo(
+    () => new Map(components.map((component) => [component.id, component])),
+    [components],
+  );
 
   return (
     <>
       {connections.map((connection) => {
-        const fromComponent = components.find(
-          (component) =>
-            component.id === connection.from.componentId,
-        );
-
-        const toComponent = components.find(
-          (component) =>
-            component.id === connection.to.componentId,
-        );
+        const fromComponent = componentsById.get(connection.from.componentId);
+        const toComponent = componentsById.get(connection.to.componentId);
 
         if (!fromComponent || !toComponent) return null;
 

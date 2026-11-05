@@ -1,10 +1,20 @@
-import type { CircuitComponent, CircuitConnection } from "@/types/circuit";
+import type {
+  CircuitComponent,
+  CircuitConnection,
+  SimulationSettings,
+} from "@/types/circuit";
 
 export interface CircuitProject {
   id: string;
   name: string;
+  description?: string;
+  schemaVersion?: number;
   components: CircuitComponent[];
   connections: CircuitConnection[];
+  simulationSettings?: SimulationSettings;
+  readOnly?: boolean;
+  isShared?: boolean;
+  createdAt?: string;
   updatedAt?: string;
 }
 
@@ -28,11 +38,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(body?.message ?? `Project API error (${response.status})`);
   }
 
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
 export function saveProject(
-  project: Pick<CircuitProject, "name" | "components" | "connections">,
+  project: Pick<CircuitProject, "name" | "components" | "connections"> & Partial<Pick<CircuitProject, "description" | "schemaVersion" | "simulationSettings">>,
   id?: string | null,
 ) {
   return request<{ project: CircuitProject }>(
@@ -52,4 +63,19 @@ export function getProject(id: string) {
 
 export function listProjects() {
   return request<{ projects: CircuitProject[] }>("/projects");
+}
+
+export function deleteProject(id: string) {
+  return request<void>(`/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function createShareLink(id: string) {
+  return request<{ token: string; project: CircuitProject }>(
+    `/projects/${encodeURIComponent(id)}/share`,
+    { method: "POST" },
+  );
+}
+
+export function getSharedProject(token: string) {
+  return request<{ project: CircuitProject }>(`/shared/${encodeURIComponent(token)}`);
 }

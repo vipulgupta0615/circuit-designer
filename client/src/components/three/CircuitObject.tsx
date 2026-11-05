@@ -33,6 +33,7 @@ export default function CircuitObject({
 
   const updateRotation = useCircuitStore((state) => state.updateRotation);
   const ledOn = useCircuitStore((state) => state.ledOn);
+  const isReadOnly = useCircuitStore((state) => state.isReadOnly);
 
   const selected = selectedId === component.id;
 
@@ -132,6 +133,33 @@ export default function CircuitObject({
             <boxGeometry args={[3.2, 0.16, 2]} />
             <meshStandardMaterial color="#e5e7eb" />
           </mesh>
+
+          {(["pos", "neg"] as const).map((rail, railIndex) => (
+            <group key={rail}>
+              <mesh position={[0, 0.095, rail === "pos" ? -0.85 : 0.85]}>
+                <boxGeometry args={[2.75, 0.012, 0.035]} />
+                <meshStandardMaterial color={rail === "pos" ? "#ef4444" : "#64748b"} />
+              </mesh>
+              {Array.from({ length: 20 }).map((_, index) => {
+                const x = -1.35 + index * 0.14;
+                const z = rail === "pos" ? -0.85 : 0.85;
+                return (
+                  <group key={`${rail}-${index}`}>
+                    <mesh position={[x, 0.105, z]}>
+                      <cylinderGeometry args={[0.025, 0.025, 0.015, 12]} />
+                      <meshStandardMaterial color="#374151" />
+                    </mesh>
+                    <CircuitPin
+                      componentId={component.id}
+                      pinId={`rail_${rail}_${index}`}
+                      position={[x, 0.17, z]}
+                      color={railIndex === 0 ? "#ef4444" : "#64748b"}
+                    />
+                  </group>
+                );
+              })}
+            </group>
+          ))}
 
           {Array.from({ length: 20 }).map((_, row) =>
             Array.from({ length: 8 }).map((_, col) => {
@@ -268,7 +296,7 @@ export default function CircuitObject({
   );
 
   // Transform controls for selected component
-  if (!selected) {
+  if (!selected || isReadOnly) {
     return model;
   }
 
